@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @match        https://riversideca.teamdynamix.com/TDWorkManagement/
@@ -205,6 +205,7 @@
         panel.appendChild(header);
         panel.appendChild(body);
         document.body.appendChild(panel);
+        keepPanelInViewport(panel, false);
 
         toggleButton.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -212,6 +213,15 @@
             body.style.display = collapsed ? 'block' : 'none';
             toggleButton.textContent = collapsed ? '−' : '+';
             saveCollapsedState(!collapsed);
+        });
+
+        let resizeTimer;
+
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                keepPanelInViewport(panel, true);
+            }, 50);
         });
 
         makeDraggable(panel, header);
@@ -274,6 +284,29 @@
 
     function clamp(value, min, max) {
         return Math.min(Math.max(value, min), max);
+    }
+
+    function keepPanelInViewport(panel, save = true) {
+        if (!panel || !document.body.contains(panel)) return;
+
+        const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+        const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+
+        const currentLeft = parseInt(panel.style.left, 10) || panel.offsetLeft || 0;
+        const currentTop = parseInt(panel.style.top, 10) || panel.offsetTop || 0;
+
+        const nextLeft = clamp(currentLeft, 0, maxLeft);
+        const nextTop = clamp(currentTop, 0, maxTop);
+
+        panel.style.left = `${nextLeft}px`;
+        panel.style.top = `${nextTop}px`;
+
+        if (save) {
+            savePosition({
+                left: nextLeft,
+                top: nextTop
+            });
+        }
     }
 
     function savePosition(position) {
