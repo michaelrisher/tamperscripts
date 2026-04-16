@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.1
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @updateurl    https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
@@ -17,6 +17,7 @@
 
     const STORAGE_KEY_POSITION = 'tmActionPanelPosition';
     const STORAGE_KEY_COLLAPSED = 'tmActionPanelCollapsed';
+    const STORAGE_KEY_NAME = 'tmActionPanelName';
 
     const config = {
         title: 'Quick Actions',
@@ -55,7 +56,7 @@
                     name = name.split(' ')[0];
                     insertIntoEditor(`Hello ${name},\n\n`);
                     let m = prompt( "Input what did sentence" );
-                    insertIntoEditor(`${m}. Please let me know if you need anything else.\n\nThanks,\nMichael Risher`);
+                    insertIntoEditor(`${m}. Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
                 }
             },
             {
@@ -92,6 +93,11 @@
     }
 
     function createPanel() {
+        //load the name
+        if ( loadNameState() === '' ){
+            saveNameState( prompt( "Enter your full name" ) );
+        }
+
         if (document.getElementById('tm-action-panel')) return;
 
         const savedPosition = loadPosition();
@@ -311,6 +317,24 @@
             return raw ? JSON.parse(raw) : false;
         } catch (error) {
             console.warn('Could not load collapsed state:', error);
+            return false;
+        }
+    }
+
+    function saveNameState( name ) {
+        try {
+            localStorage.setItem(STORAGE_KEY_NAME, JSON.stringify(name));
+        } catch (error) {
+            console.warn('Could not save name state:', error);
+        }
+    }
+
+    function loadNameState() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY_NAME);
+            return raw ? JSON.parse(raw) : '';
+        } catch (error) {
+            console.warn('Could not load name state:', error);
             return false;
         }
     }
