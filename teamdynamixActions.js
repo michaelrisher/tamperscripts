@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
+// @match        https://riversideca.teamdynamix.com/TDWorkManagement/
 // @updateurl    https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
 // @downloadurl  https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
