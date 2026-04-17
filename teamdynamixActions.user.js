@@ -5,8 +5,8 @@
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @match        https://riversideca.teamdynamix.com/TDWorkManagement/
-// @updateurl    https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
-// @downloadurl  https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
+// @updateurl    https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.user.js
+// @downloadurl  https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.user.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // @require      https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js
 // @grant        none
