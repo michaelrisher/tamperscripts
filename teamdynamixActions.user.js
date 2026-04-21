@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
-// @namespace    http://tampermonkey.net/
-// @version      1.3
+// @namespace    http://github.com/michaelrisher/tamperscripts/
+// @version      1.4
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @match        https://riversideca.teamdynamix.com/TDWorkManagement/
-// @updateurl    https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.user.js
-// @downloadurl  https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.user.js
+// @updateurl    https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
+// @downloadurl  https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // @require      https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js
 // @grant        none
@@ -16,6 +16,63 @@
 (function () {
     'use strict';
 
+    const STYLES = `
+#tm-action-panel {
+position: fixed;
+z-index: 999999;
+width: 220px;
+background: #ffffff;
+border: 1px solid #cfcfcf;
+border-radius: 12px;
+box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+font-family: Arial, sans-serif;
+overflow: hidden;
+}
+
+#tm-action-panel .tm-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 8px;
+padding: 10px 12px;
+background: #1f6feb;
+color: #fff;
+cursor: move;
+font-size: 14px;
+font-weight: bold;
+user-select: none
+}
+
+#tm-action-panel .tm-header button {
+border: none;
+background: rgba(255,255,255,0.2);
+color: #fff;
+width: 28px;
+height: 28px;
+border-radius: 6px;
+cursor: pointer;
+font-size: 18px;
+lineHeight: 1
+}
+
+#tm-action-panel .tm-actions {
+padding: 10px;
+background: #f8f9fb;
+}
+
+#tm-action-panel .tm-actions button{
+display: block;
+width: 100%;
+margin-bottom: 8px;
+padding: 10px;
+border: 1px solid #d0d7de;
+border-radius: 8px;
+background: #fff;
+cursor: pointer;
+font-size: 13px;
+text-align: left;
+}
+`;
     const STORAGE_KEY_POSITION = 'tmActionPanelPosition';
     const STORAGE_KEY_COLLAPSED = 'tmActionPanelCollapsed';
     const STORAGE_KEY_NAME = 'tmActionPanelName';
@@ -33,12 +90,18 @@
                     let name = document.querySelector( '.panel-person-card .media .media-heading a' ).textContent ?? "";
                     name = name.split(' ')[0];
                     insertIntoEditor(`Hello ${name},\n\n`);
+                },
+                condition: ()=>{
+                    return location.href.match( /update/i );
                 }
             },
             {
                 label: 'Insert Signature',
                 action: () => {
                     insertIntoEditor('Please let me know if you need anything else.\n\nThanks,\nMichael Risher');
+                },
+                condition: ()=>{
+                    return location.href.match( /update/i );
                 }
             },
             {
@@ -48,6 +111,9 @@
                     document.querySelector('#TimeAccountId').value = 7313;
                     document.querySelector('#TimeHours').value = prompt( "Enter hours" );
                     document.querySelector('#CommentsIsPrivate').checked = false;
+                },
+                condition: ()=>{
+                    return location.href.match( /update/i );
                 }
             },
             {
@@ -58,6 +124,9 @@
                     insertIntoEditor(`Hello ${name},\n\n`);
                     let m = prompt( "Input what did sentence" );
                     insertIntoEditor(`${m}. Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
+                },
+                condition: ()=>{
+                    return location.href.match( /update/i );
                 }
             },
             {
@@ -67,7 +136,12 @@
                     document.querySelectorAll( "#divAttachments .media span a" ).forEach( ( i ) => { dls.push( { url: i.href, name: i.textContent } ) } );
                     console.log( dls );
                     downloadFiles( dls );
-                }
+                },
+                condition: ()=> { return location.href.match( /TicketDet/i ); }
+            },
+            {
+                label: 'New Ticket',
+                action: ()=>{ location.href = "https://riversideca.teamdynamix.com/TDNext/Apps/2814/Tickets/New?formId=55995" }
             }
             /*{
                 label: 'Alert Test',
@@ -86,10 +160,21 @@
 
 
     function init() {
+        injectStyle();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', createPanel);
         } else {
             createPanel();
+        }
+    }
+
+    function injectStyle(){
+        let id = "mr-teamdynamixStyles";
+        if( !document.querySelector( `#${id}` ) ) {
+            let elem = document.createElement( 'style' );
+            elem.id = id;
+            elem.textContent = STYLES;
+            document.head.appendChild( elem );
         }
     }
 
@@ -108,33 +193,12 @@
         panel.id = 'tm-action-panel';
 
         Object.assign(panel.style, {
-            position: 'fixed',
             top: `${savedPosition.top}px`,
             left: `${savedPosition.left}px`,
-            zIndex: '999999',
-            width: '220px',
-            background: '#ffffff',
-            border: '1px solid #cfcfcf',
-            borderRadius: '12px',
-            boxShadow: '0 6px 18px rgba(0,0,0,0.2)',
-            fontFamily: 'Arial, sans-serif',
-            overflow: 'hidden'
         });
 
         const header = document.createElement('div');
-        Object.assign(header.style, {
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '8px',
-            padding: '10px 12px',
-            background: '#1f6feb',
-            color: '#fff',
-            cursor: 'move',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            userSelect: 'none'
-        });
+        header.className = 'tm-header';
 
         const title = document.createElement('span');
         title.textContent = config.title;
@@ -144,60 +208,44 @@
         toggleButton.type = 'button';
         toggleButton.textContent = isCollapsed ? '+' : '−';
 
-        Object.assign(toggleButton.style, {
-            border: 'none',
-            background: 'rgba(255,255,255,0.2)',
-            color: '#fff',
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '18px',
-            lineHeight: '1'
-        });
-
         const body = document.createElement('div');
-        body.style.padding = '10px';
+        body.className = 'tm-actions'
         body.style.display = isCollapsed ? 'none' : 'block';
-        body.style.background = '#f8f9fb';
 
         for (const item of config.actions) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = item.label;
+            let passCond = true;
+            try {
+                passCond = typeof item.condition === 'function' ? Boolean(item.condition()) : true;
+            } catch (err) {
+                console.error('Action condition threw:', err);
+                passCond = true;
+            }
+            //skip if not good
+            if( passCond ) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = item.label;
 
-            Object.assign(btn.style, {
-                display: 'block',
-                width: '100%',
-                marginBottom: '8px',
-                padding: '10px',
-                border: '1px solid #d0d7de',
-                borderRadius: '8px',
-                background: '#fff',
-                cursor: 'pointer',
-                fontSize: '13px',
-                textAlign: 'left'
-            });
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = '#f0f4ff';
+                });
 
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = '#f0f4ff';
-            });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = '#fff';
+                });
 
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = '#fff';
-            });
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    try {
+                        item.action();
+                    } catch (error) {
+                        console.error('Action failed:', error);
+                        alert('Action failed. Check console for details.');
+                    }
+                });
 
-            btn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                try {
-                    item.action();
-                } catch (error) {
-                    console.error('Action failed:', error);
-                    alert('Action failed. Check console for details.');
-                }
-            });
-
-            body.appendChild(btn);
+                body.appendChild(btn);
+            }
         }
 
         header.appendChild(title);
