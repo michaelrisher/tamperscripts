@@ -165,7 +165,7 @@ background: #f0f4ff;
                     let dls = [];
                     let title = document.querySelector( '#thTicket_spnTitle' ).textContent;
                     title = title.replaceAll( ' ', '-').replaceAll( /[<>:"\\/|\?\*]/g, '' );
-                    document.querySelectorAll( "#divAttachments .media span a" ).forEach( ( i ) => { dls.push( { url: i.href, name: i.textContent } ) } );
+                    document.querySelectorAll( "#divAttachments .media span a" ).forEach( ( i ) => { dls.push( { url: i.href, name: i.textContent.replaceAll( ' ', '-' )  } ) } );
                     console.log( dls );
                     downloadFiles( dls, `${title}.zip` );
                 },
