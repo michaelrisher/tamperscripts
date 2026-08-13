@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
 // @namespace    http://github.com/michaelrisher/tamperscripts/
-// @version      1.4
+// @version      1.5
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @match        https://riversideca.teamdynamix.com/TDWorkManagement/
@@ -11,6 +11,7 @@
 // @downloadurl  https://raw.githubusercontent.com/michaelrisher/tamperscripts/refs/heads/main/teamdynamixActions.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // @require      https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js
+// @require      https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js
 // @grant        none
 // ==/UserScript==
 
@@ -42,7 +43,8 @@
                     if( parsed.timeTrack ) this.timeTrack = parsed.timeTrack;
                     if( parsed.position ) this.position = parsed.position;
                     if( parsed.title ) this.title = parsed.title;
-                    if( Array.isArray( parsed.customActions ) ) this.customActions = parsed.customActions;
+                    let cas = JSON.parse( LZString.decompressFromUTF16( parsed.customActions ) );
+                    if( Array.isArray( cas ) ) this.customActions = cas;
                     this.loaded = true
                     
                 }
@@ -54,12 +56,14 @@
 
         save() {
             try{
+                let cas = JSON.stringify( this.customActions );
+                cas = LZString.compressToUTF16( cas );
                 localStorage.setItem( this.STORAGE_KEY, JSON.stringify( {
                     name: this.name,
                     signature: this.signature,
                     position: this.position,
                     title: this.title,
-                    customActions: this.customActions
+                    customActions: cas
                 } ) );
             } catch( error ) {
                 console.warn( 'Could not save configuration:', error );
@@ -917,9 +921,21 @@
         }
     }
 
-    function createPanel() {
-        //load the name
+    function generateLinkShortcuts(){
+        document.querySelectorAll( "#divAttachments .media span a" ).forEach( ( e ) => {
+            const out = e.closest('.media-body').querySelector('div:last-child');
 
+            const a = document.createElement( 'a' );
+            a.textContent = '⏬ Websafe';
+            a.addEventListener( 'click', ()=>{
+                downloadSingle( {url: e.href, name: e.textContent.replaceAll( ' ', '-' ) } )
+            } );
+
+            out.prepend( a );
+        });
+    }
+    function createPanel() {
+        setTimeout( generateLinkShortcuts, 1000 );
         if (document.getElementById('tm-action-panel')) return;
 
         const savedPosition = configuration.get('position');
@@ -1342,6 +1358,8 @@
     init();
 })();
 
+
+/** download logic */
 async function downloadFiles( files, zipName, concurrency = 3) {
     zipName = zipName || 'attachments.zip';
 
@@ -1474,5 +1492,29 @@ async function downloadFiles( files, zipName, concurrency = 3) {
         setTimeout(() => {
             try { prog.remove(); } catch {};
         }, 1800);
+    }
+}
+
+
+async function downloadSingle( file ){
+    try{
+        const res = await fetch( file.url );
+        if( !res.ok ){
+            throw new Error( `HTTP ${response.status} for ${file.url}` );
+        }
+
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL( blob );
+        const link = document.createElement('a');
+        link.href = objUrl;
+        link.download = file.name;
+
+        document.body.appendChild( link );
+        link.click();
+
+        document.body.removeChild( link );
+        URL.revokeObjectURL( objUrl );
+    } catch{
+        window.open( file.url );
     }
 }
