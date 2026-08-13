@@ -18,80 +18,713 @@
 (function () {
     'use strict';
 
+    class Configuration {
+        STORAGE_KEY = 'tmActionPanelConfig';
+
+        constructor() {
+            this.name = 'Your Name';
+            this.signature = 'Please let me know if you need anything else.\n\nThanks,\n';
+            this.position = { top: 120, left: 20 };
+            this.title = 'Quick Actions';
+            this.customActions = [];
+            this.loaded = false;
+            this.modalOpen = false;
+        }
+
+        load() {
+            try{
+                let raw = localStorage.getItem( this.STORAGE_KEY );
+                //replace with loaded values if found
+                if( raw ) {
+                    let parsed = JSON.parse( raw );
+                    if( parsed.name ) this.name = parsed.name;
+                    if( parsed.signature ) this.signature = parsed.signature;
+                    if( parsed.timeTrack ) this.timeTrack = parsed.timeTrack;
+                    if( parsed.position ) this.position = parsed.position;
+                    if( parsed.title ) this.title = parsed.title;
+                    if( Array.isArray( parsed.customActions ) ) this.customActions = parsed.customActions;
+                    this.loaded = true
+                    
+                }
+            } catch( error ) {
+                console.warn( 'Could not load configuration:', error );
+            }
+            return this.loaded
+        }
+
+        save() {
+            try{
+                localStorage.setItem( this.STORAGE_KEY, JSON.stringify( {
+                    name: this.name,
+                    signature: this.signature,
+                    position: this.position,
+                    title: this.title,
+                    customActions: this.customActions
+                } ) );
+            } catch( error ) {
+                console.warn( 'Could not save configuration:', error );
+            }
+        }
+
+        displayModal(onSave) {
+            if( this.modalOpen ) return;
+            this.modalOpen = true;
+            const modal = document.createElement('div');
+            modal.className =  'tm-config-modal';
+
+            const header = document.createElement('div');
+            header.className = 'tm-header';
+
+            const title = document.createElement('span');
+            title.textContent = 'Configure';
+            title.style.flex = '1';
+
+            const body = document.createElement( 'div' );
+            body.className ='tm-body';
+
+            const titleInput = document.createElement('input');
+            titleInput.type = 'text';
+            titleInput.placeholder = 'Title';
+            titleInput.value = this.title;
+
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.placeholder = 'Your Name';
+            nameInput.value = this.name;
+
+            const signatureInput = document.createElement('textarea');
+            signatureInput.placeholder = 'Default Signature';
+            signatureInput.value = this.signature;
+
+            const customHeader = document.createElement('div');
+            customHeader.className = 'tm-section-title';
+            customHeader.textContent = 'Custom Actions';
+
+            const customActionsContainer = document.createElement('div');
+            customActionsContainer.className = 'tm-custom-actions-config';
+
+            const setAccordionState = (targetRow, shouldOpen) => {
+                const allRows = customActionsContainer.querySelectorAll('.tm-custom-action-row');
+                allRows.forEach((row) => {
+                    const body = row.querySelector('.tm-custom-action-body');
+                    const chevron = row.querySelector('.tm-custom-action-chevron');
+                    const isTarget = row === targetRow;
+                    const open = isTarget && shouldOpen;
+
+                    row.classList.toggle('is-open', open);
+                    if (body) body.style.display = open ? 'flex' : 'none';
+                    if (chevron) chevron.textContent = open ? '−' : '+';
+                });
+            };
+
+            const createCustomActionRow = (action = {}) => {
+                const row = document.createElement('div');
+                row.className = 'tm-custom-action-row';
+
+                const headerButton = document.createElement('button');
+                headerButton.type = 'button';
+                headerButton.className = 'tm-custom-action-header';
+
+                const headerLabel = document.createElement('span');
+                headerLabel.className = 'tm-custom-action-header-label';
+                headerLabel.textContent = (action.label || '').trim() || 'New action';
+
+                const headerChevron = document.createElement('span');
+                headerChevron.className = 'tm-custom-action-chevron';
+                headerChevron.textContent = '+';
+
+                headerButton.appendChild(headerLabel);
+                headerButton.appendChild(headerChevron);
+
+                const rowBody = document.createElement('div');
+                rowBody.className = 'tm-custom-action-body';
+                rowBody.style.display = 'none';
+
+                const actionLabelInput = document.createElement('input');
+                actionLabelInput.className = 'tm-custom-action-label';
+                actionLabelInput.type = 'text';
+                actionLabelInput.placeholder = 'Button label';
+                actionLabelInput.value = action.label ?? '';
+                actionLabelInput.addEventListener('input', () => {
+                    const nextLabel = actionLabelInput.value.trim();
+                    headerLabel.textContent = nextLabel || 'New action';
+                });
+
+                const actionModeSelect = document.createElement('select');
+                actionModeSelect.className = 'tm-custom-action-mode';
+                const insertTextOption = document.createElement('option');
+                insertTextOption.value = 'insertText';
+                insertTextOption.textContent = 'Insert text into editor';
+                const runJsOption = document.createElement('option');
+                runJsOption.value = 'runJs';
+                runJsOption.textContent = 'Run JavaScript';
+                actionModeSelect.appendChild(insertTextOption);
+                actionModeSelect.appendChild(runJsOption);
+                actionModeSelect.value = action.mode === 'runJs' ? 'runJs' : 'insertText';
+
+                const actionContentInput = document.createElement('textarea');
+                actionContentInput.className = 'tm-custom-action-content';
+                actionContentInput.value = action.mode === 'runJs' ? (action.script ?? '') : (action.text ?? '');
+
+                const updateContentInputForMode = () => {
+                    const mode = actionModeSelect.value;
+                    if (mode === 'runJs') {
+                        actionContentInput.placeholder = 'JavaScript to run (helpers, configuration, customAction available)';
+                    } else {
+                        actionContentInput.placeholder = 'Text to insert when clicked';
+                    }
+                };
+                updateContentInputForMode();
+                actionModeSelect.addEventListener('change', updateContentInputForMode);
+
+                const actionPageInput = document.createElement('input');
+                actionPageInput.className = 'tm-custom-action-url-pattern';
+                actionPageInput.type = 'text';
+                actionPageInput.placeholder = 'URL pattern (optional, regex)';
+                actionPageInput.value = action.urlPattern ?? '';
+
+                const actionWidthSelect = document.createElement('select');
+                actionWidthSelect.className = 'tm-custom-action-width';
+                const fullOption = document.createElement('option');
+                fullOption.value = 'full';
+                fullOption.textContent = 'Full width';
+                const halfOption = document.createElement('option');
+                halfOption.value = 'half';
+                halfOption.textContent = 'Half width';
+                actionWidthSelect.appendChild(fullOption);
+                actionWidthSelect.appendChild(halfOption);
+                actionWidthSelect.value = action.class === 'half' ? 'half' : 'full';
+
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.textContent = 'Remove';
+                removeButton.className = 'tm-btn tm-btn-danger';
+                removeButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    customActionsContainer.removeChild(row);
+                });
+
+                headerButton.addEventListener('click', () => {
+                    const isOpen = row.classList.contains('is-open');
+                    setAccordionState(row, !isOpen);
+                });
+
+                rowBody.appendChild(actionLabelInput);
+                rowBody.appendChild(actionModeSelect);
+                rowBody.appendChild(actionContentInput);
+                rowBody.appendChild(actionPageInput);
+                rowBody.appendChild(actionWidthSelect);
+                rowBody.appendChild(removeButton);
+
+                row.appendChild(headerButton);
+                row.appendChild(rowBody);
+
+                return row;
+            };
+
+            const addCustomActionButton = document.createElement('button');
+            addCustomActionButton.type = 'button';
+            addCustomActionButton.textContent = 'Add Action';
+            addCustomActionButton.className = 'tm-btn tm-btn-secondary';
+            addCustomActionButton.addEventListener('click', () => {
+                const row = createCustomActionRow();
+                customActionsContainer.appendChild(row);
+                setAccordionState(row, true);
+            });
+
+            (this.customActions || []).forEach((action) => {
+                customActionsContainer.appendChild(createCustomActionRow(action));
+            });
+
+            const saveButton = document.createElement('button');
+            saveButton.textContent = 'Save';
+            saveButton.className = 'tm-btn tm-btn-primary';
+
+
+            saveButton.addEventListener('click', () => {
+                this.title = titleInput.value.trim();
+                this.name = nameInput.value.trim();
+                this.signature = signatureInput.value.trim();
+                this.customActions = [...customActionsContainer.querySelectorAll('.tm-custom-action-row')]
+                    .map((row) => {
+                        const label = (row.querySelector('.tm-custom-action-label')?.value || '').trim();
+                        const mode = row.querySelector('.tm-custom-action-mode')?.value === 'runJs' ? 'runJs' : 'insertText';
+                        const content = (row.querySelector('.tm-custom-action-content')?.value || '').trim();
+                        const urlPattern = (row.querySelector('.tm-custom-action-url-pattern')?.value || '').trim();
+                        const width = row.querySelector('.tm-custom-action-width')?.value === 'half' ? 'half' : '';
+
+                        if (!label || !content) return null;
+
+                        const payload = {
+                            mode,
+                            text: mode === 'insertText' ? content : '',
+                            script: mode === 'runJs' ? content : ''
+                        };
+
+                        return {
+                            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                            label,
+                            urlPattern,
+                            class: width,
+                            ...payload
+                        };
+                    })
+                    .filter(Boolean);
+                this.save();
+                document.body.removeChild(shadowBg);
+                document.body.removeChild(modal);
+                this.modalOpen = false;
+                if (typeof onSave === 'function') {
+                    onSave();
+                }
+            });
+
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.className = 'tm-btn tm-btn-secondary';
+            cancelButton.addEventListener('click', () => {
+                document.body.removeChild(shadowBg);
+                document.body.removeChild(modal);
+                this.modalOpen = false;
+            });
+
+            const footer = document.createElement('div');
+            footer.className = 'tm-modal-footer';
+            footer.appendChild(cancelButton);
+            footer.appendChild(saveButton);
+
+            //create shadow behind modal
+            const shadowBg = document.createElement( 'div' );
+            shadowBg.className = 'tm-shadow-backdrop';
+            
+
+            header.appendChild( title );
+
+            body.appendChild(titleInput);
+            body.appendChild(nameInput);
+            body.appendChild(signatureInput);
+            body.appendChild(customHeader);
+            body.appendChild(addCustomActionButton);
+            body.appendChild(customActionsContainer);
+            body.appendChild(footer);
+
+            modal.appendChild( header );
+            modal.appendChild( body );
+
+            document.body.appendChild( shadowBg );
+            document.body.appendChild(modal);
+        }
+
+        get(key) {
+            return this[key];
+        }
+
+        getHtml(key){
+            return this[key].replace(/\n/g, '<br>');
+        }
+
+        set(key, v){
+            this[key] = v;
+            this.save();
+        }
+    }
+
     const STYLES = `
+:root {
+    --tm-font: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --tm-bg: #f4f7fc;
+    --tm-surface: #ffffff;
+    --tm-surface-soft: #f8faff;
+    --tm-border: #d7deea;
+    --tm-border-strong: #c4cfe1;
+    --tm-text: #1a2333;
+    --tm-text-muted: #5f6f86;
+    --tm-primary: #2764ff;
+    --tm-primary-hover: #1d54e0;
+    --tm-primary-soft: #e8efff;
+    --tm-danger: #dd3b3b;
+    --tm-radius-sm: 10px;
+    --tm-radius-md: 14px;
+    --tm-radius-lg: 18px;
+    --tm-shadow: 0 18px 40px rgba(15, 27, 64, 0.22);
+    --tm-shadow-soft: 0 10px 24px rgba(15, 27, 64, 0.12);
+}
+
+#tm-action-panel,
+.tm-config-modal,
+#td-download-progress {
+    font-family: var(--tm-font);
+    color: var(--tm-text);
+}
+
 #tm-action-panel {
-position: fixed;
-z-index: 999999;
-width: 220px;
-background: #ffffff;
-border: 1px solid #cfcfcf;
-border-radius: 12px;
-box-shadow: 0 6px 18px rgba(0,0,0,0.2);
-font-family: Arial, sans-serif;
-overflow: hidden;
+    position: fixed;
+    z-index: 999999;
+    width: 260px;
+    background: var(--tm-surface);
+    border: 1px solid var(--tm-border);
+    border-radius: var(--tm-radius-lg);
+    box-shadow: var(--tm-shadow);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.tm-shadow-backdrop {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: rgba(13, 20, 35, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 999998;
+    animation: tmFadeIn 0.16s ease-out;
+}
+
+.tm-config-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(760px, 94vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 999999;
+    background: var(--tm-surface);
+    border: 1px solid var(--tm-border);
+    border-radius: var(--tm-radius-lg);
+    box-shadow: var(--tm-shadow);
+    overflow: hidden;
+    animation: tmScaleIn 0.16s ease-out;
+}
+
+#tm-action-panel .tm-header,
+.tm-config-modal .tm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #1f5bff, #2b78ff 60%, #4098ff);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    user-select: none;
 }
 
 #tm-action-panel .tm-header {
-display: flex;
-align-items: center;
-justify-content: space-between;
-gap: 8px;
-padding: 10px 12px;
-background: #1f6feb;
-color: #fff;
-cursor: move;
-font-size: 14px;
-font-weight: bold;
-user-select: none
+    cursor: move;
+}
+
+.tm-config-modal .tm-header {
+    cursor: default;
 }
 
 #tm-action-panel .tm-header button {
-border: none;
-background: rgba(255,255,255,0.2);
-color: #fff;
-width: 28px;
-height: 28px;
-border-radius: 6px;
-cursor: pointer;
-font-size: 18px;
-lineHeight: 1
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.14s ease;
+}
+
+#tm-action-panel .tm-header button:hover {
+    background: rgba(255, 255, 255, 0.24);
+    transform: translateY(-1px);
 }
 
 #tm-action-panel .tm-actions {
-padding: 10px;
-background: #f8f9fb;
-display: flex;
-flex-direction: row;
-flex-wrap: wrap;
-gap: 5px;
+    padding: 10px;
+    background: var(--tm-bg);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-#tm-action-panel .tm-actions button{
-display: block;
-width: 100%;
-margin-bottom: 8px;
-padding: 10px;
-border: 1px solid #d0d7de;
-border-radius: 8px;
-background: #fff;
-cursor: pointer;
-font-size: 13px;
-text-align: left;
-}
-#tm-action-panel .tm-actions button.half {
-width: calc( 50% - 5px );
+#tm-action-panel .tm-actions .tm-action-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--tm-border);
+    border-radius: var(--tm-radius-sm);
+    background: var(--tm-surface);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    text-align: left;
+    color: var(--tm-text);
+    transition: all 0.14s ease;
 }
 
-#tm-action-panel .tm-actions button:hover, #tm-action-panel .tm-actions button:active {
-background: #f0f4ff;
+#tm-action-panel .tm-actions .tm-action-btn.half {
+    width: calc(50% - 4px);
+}
+
+#tm-action-panel .tm-actions .tm-action-btn:hover,
+#tm-action-panel .tm-actions .tm-action-btn:active {
+    background: var(--tm-primary-soft);
+    border-color: #adc2f9;
+    transform: translateY(-1px);
+}
+
+.tm-config-modal .tm-body {
+    padding: 14px;
+    background: var(--tm-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.tm-config-modal .tm-body input,
+.tm-config-modal .tm-body textarea,
+.tm-config-modal .tm-body select {
+    width: 100%;
+    border: 1px solid var(--tm-border);
+    border-radius: var(--tm-radius-sm);
+    background: var(--tm-surface);
+    color: var(--tm-text);
+    padding: 9px 11px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.tm-config-modal .tm-body input:focus,
+.tm-config-modal .tm-body textarea:focus,
+.tm-config-modal .tm-body select:focus {
+    border-color: #8eaef7;
+    box-shadow: 0 0 0 3px rgba(39, 100, 255, 0.14);
+}
+
+.tm-config-modal .tm-body textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.tm-section-title {
+    width: 100%;
+    margin-top: 4px;
+    margin-bottom: 2px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--tm-text-muted);
+}
+
+.tm-config-modal .tm-custom-actions-config {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tm-config-modal .tm-custom-action-row {
+    width: 100%;
+    border: 1px solid var(--tm-border);
+    border-radius: var(--tm-radius-md);
+    background: var(--tm-surface);
+    overflow: hidden;
+    box-shadow: var(--tm-shadow-soft);
+}
+
+.tm-config-modal .tm-custom-action-header {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid #ecf1fb;
+    background: #ffffff;
+    padding: 11px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--tm-text);
+    text-align: left;
+    transition: background 0.14s ease;
+}
+
+.tm-config-modal .tm-custom-action-header:hover {
+    background: #f8fbff;
+}
+
+.tm-config-modal .tm-custom-action-row.is-open .tm-custom-action-header {
+    background: #f4f8ff;
+}
+
+.tm-config-modal .tm-custom-action-header-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 12px;
+}
+
+.tm-config-modal .tm-custom-action-chevron {
+    font-size: 16px;
+    line-height: 1;
+    color: var(--tm-text-muted);
+}
+
+.tm-config-modal .tm-custom-action-body {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tm-config-modal .tm-custom-action-row .tm-custom-action-content {
+    min-height: 110px;
+}
+
+.tm-modal-footer {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 2px;
+}
+
+.tm-btn {
+    border: 1px solid transparent;
+    border-radius: var(--tm-radius-sm);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.14s ease;
+}
+
+.tm-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(39, 100, 255, 0.14);
+}
+
+.tm-btn-primary {
+    background: var(--tm-primary);
+    border-color: var(--tm-primary);
+    color: #fff;
+}
+
+.tm-btn-primary:hover {
+    background: var(--tm-primary-hover);
+    border-color: var(--tm-primary-hover);
+    transform: translateY(-1px);
+}
+
+.tm-btn-secondary {
+    background: #ffffff;
+    border-color: var(--tm-border-strong);
+    color: var(--tm-text);
+}
+
+.tm-btn-secondary:hover {
+    background: #f5f8fe;
+    transform: translateY(-1px);
+}
+
+.tm-btn-danger {
+    background: #fff4f4;
+    border-color: #f1b4b4;
+    color: var(--tm-danger);
+}
+
+.tm-btn-danger:hover {
+    background: #ffecec;
+}
+
+#td-download-progress {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: min(380px, calc(100vw - 24px));
+    background: var(--tm-surface);
+    border: 1px solid var(--tm-border);
+    border-radius: var(--tm-radius-md);
+    box-shadow: var(--tm-shadow);
+    padding: 12px;
+    z-index: 2147483647;
+    animation: tmPopIn 0.16s ease-out;
+}
+
+#td-download-progress .tm-download-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+#td-download-progress #td-download-status {
+    margin-bottom: 8px;
+    color: var(--tm-text-muted);
+}
+
+#td-download-progress .tm-download-track {
+    background: #e8edf8;
+    border-radius: 999px;
+    overflow: hidden;
+    height: 10px;
+    margin-bottom: 8px;
+}
+
+#td-download-progress #td-download-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #3874ff, #60a5ff);
+    transition: width 0.15s ease;
+}
+
+#td-download-progress .tm-download-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+@keyframes tmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes tmScaleIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes tmPopIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 `;
-    const STORAGE_KEY_POSITION = 'tmActionPanelPosition';
-    const STORAGE_KEY_COLLAPSED = 'tmActionPanelCollapsed';
-    const STORAGE_KEY_NAME = 'tmActionPanelName';
+    const STORAGE_PREFIX = 'tmActionPanel';
+    const STORAGE_KEY_POSITION = STORAGE_PREFIX + 'Position';
+    const STORAGE_KEY_COLLAPSED = STORAGE_PREFIX + 'Collapsed';
+    const STORAGE_KEY_NAME = STORAGE_PREFIX + 'Name';
 
     const config = {
-        title: 'Quick Actions',
         defaultPosition: {
             top: 120,
             left: 20
@@ -113,7 +746,7 @@ background: #f0f4ff;
                 label: 'Insert Signature',
                 class: 'half',
                 action: () => {
-                    insertIntoEditor(`Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
+                    insertIntoEditor(`${configuration.get('signature')}${configuration.get('name')}`);
                 },
                 condition: ()=>{
                     return location.href.match( /update/i );
@@ -139,7 +772,7 @@ background: #f0f4ff;
                     name = name.split(' ')[0];
                     insertIntoEditor(`Hello ${name},\n\n`);
                     let m = prompt( "Input what did sentence" );
-                    insertIntoEditor(`${m}. Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
+                    insertIntoEditor(`${m}. ${configuration.get('signature')}${configuration.get('name')}`);
                 },
                 condition: ()=>{
                     return location.href.match( /update/i );
@@ -148,11 +781,13 @@ background: #f0f4ff;
             {
                 label: 'Comment',
                 action: () => {
+                    let commentBtn = document.querySelector( '#btnComment' );
                     let name = document.querySelector( '.panel-person-card .media .media-heading a' ).textContent ?? "";
                     name = name.split(' ')[0];
-                    insertIntoEditor(`Hello ${name},\n\n`);
+                    let s = `Hello ${name},<br><br>`;
                     let m = prompt( "Input what did sentence" );
-                    insertIntoEditor(`${m}. Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
+                    s += (`${m}. ${configuration.get('signature')}${configuration.get('name')}`);
+                    showHideCommentInput(true, s );
                 },
                 condition: ()=>{
                     return location.href.match( /TicketDet/i );
@@ -193,8 +828,77 @@ background: #f0f4ff;
         ]
     };
 
+    function createRuntimeAction(customAction) {
+        const label = (customAction?.label || '').trim();
+        const mode = customAction?.mode === 'runJs' ? 'runJs' : 'insertText';
+        const text = customAction?.text || '';
+        const script = customAction?.script || '';
+
+        if (!label) return null;
+        if (mode === 'insertText' && !text) return null;
+        if (mode === 'runJs' && !script) return null;
+
+        const className = customAction.class === 'half' ? 'half' : undefined;
+        const urlPattern = (customAction.urlPattern || '').trim();
+
+        return {
+            label,
+            class: className,
+            action: () => {
+                if (mode === 'runJs') {
+                    const runner = new Function('helpers', 'configuration', 'customAction', script);
+                    runner({
+                        insertIntoEditor,
+                        insertHtmlIntoEditor,
+                        downloadFiles,
+                        location: window.location,
+                        document: window.document,
+                        window,
+                        alert,
+                        prompt,
+                        console,
+                        showHideCommentInput: window.showHideCommentInput
+                    }, configuration, customAction);
+                    return;
+                }
+
+                insertIntoEditor(text.replace(/\\n/g, '\n'));
+            },
+            condition: () => {
+                if (!urlPattern) return true;
+                try {
+                    return new RegExp(urlPattern, 'i').test(location.href);
+                } catch (error) {
+                    console.warn('Invalid custom action URL pattern:', urlPattern, error);
+                    return true;
+                }
+            }
+        };
+    }
+
+    function getAllActions() {
+        const custom = (configuration?.customActions || [])
+            .map(createRuntimeAction)
+            .filter(Boolean);
+
+        return [...config.actions, ...custom];
+    }
+
+    function refreshPanel() {
+        const existing = document.getElementById('tm-action-panel');
+        if (existing) {
+            existing.remove();
+        }
+        createPanel();
+    }
+
+    let configuration;
 
     function init() {
+        configuration = new Configuration();
+        if( !configuration.load() ){
+            configuration.displayModal();
+        }
         injectStyle();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', createPanel);
@@ -215,13 +919,10 @@ background: #f0f4ff;
 
     function createPanel() {
         //load the name
-        if ( loadNameState() === '' ){
-            saveNameState( prompt( "Enter your full name" ) );
-        }
 
         if (document.getElementById('tm-action-panel')) return;
 
-        const savedPosition = loadPosition();
+        const savedPosition = configuration.get('position');
         const isCollapsed = loadCollapsedState();
 
         const panel = document.createElement('div');
@@ -236,18 +937,23 @@ background: #f0f4ff;
         header.className = 'tm-header';
 
         const title = document.createElement('span');
-        title.textContent = config.title;
+        title.textContent = configuration.title;
         title.style.flex = '1';
 
         const toggleButton = document.createElement('button');
         toggleButton.type = 'button';
         toggleButton.textContent = isCollapsed ? '+' : '−';
 
+        const configBtn =  document.createElement('button');
+        configBtn.type = 'button';
+        configBtn.textContent = '⚙';
+        configBtn.title = 'Configure';
+
         const body = document.createElement('div');
         body.className = 'tm-actions'
         body.style.display = isCollapsed ? 'none' : 'flex';
 
-        for (const item of config.actions) {
+        for (const item of getAllActions()) {
             let passCond = true;
             try {
                 passCond = typeof item.condition === 'function' ? Boolean(item.condition()) : true;
@@ -260,7 +966,10 @@ background: #f0f4ff;
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.textContent = item.label;
-                btn.classList = item.class ?? '';
+                btn.className = 'tm-action-btn';
+                if (item.class) {
+                    btn.classList.add(item.class);
+                }
 
                 btn.addEventListener('click', (event) => {
                     event.stopPropagation();
@@ -277,6 +986,7 @@ background: #f0f4ff;
         }
 
         header.appendChild(title);
+        header.appendChild(configBtn);
         header.appendChild(toggleButton);
         panel.appendChild(header);
         panel.appendChild(body);
@@ -289,6 +999,12 @@ background: #f0f4ff;
             body.style.display = collapsed ? 'flex' : 'none';
             toggleButton.textContent = collapsed ? '−' : '+';
             saveCollapsedState(!collapsed);
+        });
+
+        configBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            //open modal to set name, default signature, etc.
+            configuration.displayModal(refreshPanel);
         });
 
         let resizeTimer;
@@ -351,7 +1067,7 @@ background: #f0f4ff;
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
 
-            savePosition({
+            configuration.set('position',{
                 left: panel.offsetLeft,
                 top: panel.offsetTop
             });
@@ -378,39 +1094,11 @@ background: #f0f4ff;
         panel.style.top = `${nextTop}px`;
 
         if (save) {
-            savePosition({
+            configuration.set('position',{
                 left: nextLeft,
                 top: nextTop
             });
         }
-    }
-
-    function savePosition(position) {
-        try {
-            localStorage.setItem(STORAGE_KEY_POSITION, JSON.stringify(position));
-        } catch (error) {
-            console.warn('Could not save position:', error);
-        }
-    }
-
-    function loadPosition() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY_POSITION);
-            if (!raw) return config.defaultPosition;
-
-            const parsed = JSON.parse(raw);
-
-            if (
-                typeof parsed.left === 'number' &&
-                typeof parsed.top === 'number'
-            ) {
-                return parsed;
-            }
-        } catch (error) {
-            console.warn('Could not load saved position:', error);
-        }
-
-        return config.defaultPosition;
     }
 
     function saveCollapsedState(isCollapsed) {
@@ -427,24 +1115,6 @@ background: #f0f4ff;
             return raw ? JSON.parse(raw) : false;
         } catch (error) {
             console.warn('Could not load collapsed state:', error);
-            return false;
-        }
-    }
-
-    function saveNameState( name ) {
-        try {
-            localStorage.setItem(STORAGE_KEY_NAME, JSON.stringify(name));
-        } catch (error) {
-            console.warn('Could not save name state:', error);
-        }
-    }
-
-    function loadNameState() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY_NAME);
-            return raw ? JSON.parse(raw) : '';
-        } catch (error) {
-            console.warn('Could not load name state:', error);
             return false;
         }
     }
@@ -684,32 +1354,16 @@ async function downloadFiles( files, zipName, concurrency = 3) {
     if (!prog) {
         prog = document.createElement('div');
         prog.id = PROG_ID;
-        Object.assign(prog.style, {
-            position: 'fixed',
-            right: '20px',
-            bottom: '20px',
-            width: '360px',
-            background: '#fff',
-            border: '1px solid #ccc',
-            padding: '12px',
-            borderRadius: '8px',
-            boxShadow: '0 6px 18px rgba(0,0,0,0.15)',
-            zIndex: 2147483647,
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '13px'
-        });
 
         prog.innerHTML = `
-            <div style="font-weight:600;margin-bottom:8px">Downloading files</div>
-            <div id="td-download-status" style="margin-bottom:8px;color:#333">Preparing...</div>
-            <div style="background:#eee;border-radius:6px;overflow:hidden;height:12px;margin-bottom:8px">
-                <div id="td-download-bar" style="width:0%;height:100%;background:#1f6feb"></div>
+            <div class="tm-download-title">Downloading files</div>
+            <div id="td-download-status">Preparing...</div>
+            <div class="tm-download-track">
+                <div id="td-download-bar"></div>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div class="tm-download-footer">
                 <div id="td-download-percent">0%</div>
-                <div style="display:flex;gap:8px">
-                    <button id="td-download-close" style="background:#f4f4f4;border:1px solid #ddd;border-radius:6px;padding:6px 8px;cursor:pointer">Close</button>
-                </div>
+                <button id="td-download-close" class="tm-btn tm-btn-secondary">Close</button>
             </div>
         `;
 
