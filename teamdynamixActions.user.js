@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
 // @namespace    http://github.com/michaelrisher/tamperscripts/
-// @version      1.3
+// @version      1.4
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @match        https://riversideca.teamdynamix.com/TDWorkManagement/
@@ -113,7 +113,7 @@ background: #f0f4ff;
                 label: 'Insert Signature',
                 class: 'half',
                 action: () => {
-                    insertIntoEditor('Please let me know if you need anything else.\n\nThanks,\nMichael Risher');
+                    insertIntoEditor(`Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
                 },
                 condition: ()=>{
                     return location.href.match( /update/i );
@@ -143,6 +143,19 @@ background: #f0f4ff;
                 },
                 condition: ()=>{
                     return location.href.match( /update/i );
+                }
+            },
+            {
+                label: 'Comment',
+                action: () => {
+                    let name = document.querySelector( '.panel-person-card .media .media-heading a' ).textContent ?? "";
+                    name = name.split(' ')[0];
+                    insertIntoEditor(`Hello ${name},\n\n`);
+                    let m = prompt( "Input what did sentence" );
+                    insertIntoEditor(`${m}. Please let me know if you need anything else.\n\nThanks,\n${loadNameState()}`);
+                },
+                condition: ()=>{
+                    return location.href.match( /TicketDet/i );
                 }
             },
             {
