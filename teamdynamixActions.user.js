@@ -927,10 +927,12 @@
 
             const a = document.createElement( 'a' );
             a.textContent = '⏬ Websafe';
+            a.className = 'tm-websafe-dl';
             a.addEventListener( 'click', ()=>{
                 downloadSingle( {url: e.href, name: e.textContent.replaceAll( ' ', '-' ) } )
             } );
-
+            //if there is a link already dont run again
+            if( out.querySelector( 'a.tm-websafe-dl') ) return;
             out.prepend( a );
         });
     }
