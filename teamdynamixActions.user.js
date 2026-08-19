@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Draggable teamdynamix quick actions
 // @namespace    http://github.com/michaelrisher/tamperscripts/
-// @version      1.5
+// @version      1.6
 // @description  Adds a draggable button that inserts custom text into CKEditor
 // @match        https://riversideca.teamdynamix.com/TDNext/*
 // @match        https://riversideca.teamdynamix.com/TDWorkManagement/
@@ -24,7 +24,7 @@
 
         constructor() {
             this.name = 'Your Name';
-            this.signature = 'Please let me know if you need anything else.\n\nThanks,\n';
+            this.signature = 'Please let me know if you need anything else.\n\nThanks,\n{{name}}';
             this.position = { top: 120, left: 20 };
             this.title = 'Quick Actions';
             this.customActions = [];
@@ -247,8 +247,8 @@
 
             saveButton.addEventListener('click', () => {
                 this.title = titleInput.value.trim();
-                this.name = nameInput.value.trim();
-                this.signature = signatureInput.value.trim();
+                this.name = nameInput.value;
+                this.signature = signatureInput.value.replaceAll( '{{name}}', nameInput.value );
                 this.customActions = [...customActionsContainer.querySelectorAll('.tm-custom-action-row')]
                     .map((row) => {
                         const label = (row.querySelector('.tm-custom-action-label')?.value || '').trim();
@@ -724,10 +724,9 @@
 }
 `;
     const STORAGE_PREFIX = 'tmActionPanel';
-    const STORAGE_KEY_POSITION = STORAGE_PREFIX + 'Position';
     const STORAGE_KEY_COLLAPSED = STORAGE_PREFIX + 'Collapsed';
-    const STORAGE_KEY_NAME = STORAGE_PREFIX + 'Name';
 
+    let configuration;
     const config = {
         defaultPosition: {
             top: 120,
@@ -750,7 +749,7 @@
                 label: 'Insert Signature',
                 class: 'half',
                 action: () => {
-                    insertIntoEditor(`${configuration.get('signature')}${configuration.get('name')}`);
+                    insertIntoEditor(`${configuration.get('signature')}`);
                 },
                 condition: ()=>{
                     return location.href.match( /update/i );
@@ -776,7 +775,7 @@
                     name = name.split(' ')[0];
                     insertIntoEditor(`Hello ${name},\n\n`);
                     let m = prompt( "Input what did sentence" );
-                    insertIntoEditor(`${m}. ${configuration.get('signature')}${configuration.get('name')}`);
+                    insertIntoEditor(`${m} ${configuration.get('signature')}`);
                 },
                 condition: ()=>{
                     return location.href.match( /update/i );
@@ -790,7 +789,7 @@
                     name = name.split(' ')[0];
                     let s = `Hello ${name},<br><br>`;
                     let m = prompt( "Input what did sentence" );
-                    s += (`${m}. ${configuration.get('signature')}${configuration.get('name')}`);
+                    s += (`${m} ${configuration.get('signature')}`);
                     showHideCommentInput(true, s );
                 },
                 condition: ()=>{
@@ -831,6 +830,19 @@
             },
         ]
     };
+    
+    function init() {
+        configuration = new Configuration();
+        if( !configuration.load() ){
+            configuration.displayModal();
+        }
+        injectStyle();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', createPanel);
+        } else {
+            createPanel();
+        }
+    }
 
     function createRuntimeAction(customAction) {
         const label = (customAction?.label || '').trim();
@@ -896,21 +908,6 @@
         createPanel();
     }
 
-    let configuration;
-
-    function init() {
-        configuration = new Configuration();
-        if( !configuration.load() ){
-            configuration.displayModal();
-        }
-        injectStyle();
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', createPanel);
-        } else {
-            createPanel();
-        }
-    }
-
     function injectStyle(){
         let id = "mr-teamdynamixStyles";
         if( !document.querySelector( `#${id}` ) ) {
@@ -936,6 +933,7 @@
             out.prepend( a );
         });
     }
+
     function createPanel() {
         setTimeout( generateLinkShortcuts, 1000 );
         if (document.getElementById('tm-action-panel')) return;
