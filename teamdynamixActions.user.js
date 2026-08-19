@@ -790,6 +790,7 @@
                     let s = `Hello ${name},<br><br>`;
                     let m = prompt( "Input what did sentence" );
                     s += (`${m} ${configuration.get('signature')}`);
+                    s = s.replace(/(?:\r\n|\r|\n)/g, '<br>');
                     showHideCommentInput(true, s );
                 },
                 condition: ()=>{
