@@ -773,8 +773,9 @@
                 action: () => {
                     let name = document.querySelector( '.panel-person-card .media .media-heading a' ).textContent ?? "";
                     name = name.split(' ')[0];
-                    insertIntoEditor(`Hello ${name},\n\n`);
                     let m = prompt( "Input what did sentence" );
+                    if( m === null ) return;
+                    insertIntoEditor(`Hello ${name},\n\n`);
                     insertIntoEditor(`${m} ${configuration.get('signature')}`);
                 },
                 condition: ()=>{
@@ -803,6 +804,7 @@
                 action: () => {
                     document.querySelector('#TimeAccountId').value = 7313;
                     let hours = prompt( "Enter hours" );
+                    if ( hours === null ) return;
                     document.querySelector('#TimeHours').value = hours;
                     insertIntoEditor(`Adding ${hours} hour${hours>1?'s':''} to time tracking.`);
                     document.querySelector( '#btnSubmit' ).click()
